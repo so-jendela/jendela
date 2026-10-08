@@ -146,7 +146,25 @@ add_custom_command(
         jendela_bootloader
 )
 
+add_custom_command(
+    OUTPUT
+        ${JENDELA_ESP_DIR}/kernel.elf
+
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory
+        ${JENDELA_ESP_DIR}
+
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_BINARY_DIR}/jendela_kernel.elf
+        ${JENDELA_ESP_DIR}/kernel.elf
+
+    DEPENDS
+        jendela_kernel
+)
+
 add_custom_target(jendela_esp ALL
     DEPENDS
         ${JENDELA_EFI_BOOT_DIR}/BOOTX64.EFI
+        ${JENDELA_ESP_DIR}/kernel.elf
 )
