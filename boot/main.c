@@ -198,6 +198,41 @@ static void print(
     );
 }
 
+/*
+ * ELF64 Definition
+ */
+typedef struct {
+    uint8_t  e_ident[16];
+
+    uint16_t e_type;
+    uint16_t e_machine;
+    uint32_t e_version;
+
+    uint64_t e_entry;
+    uint64_t e_phoff;
+    uint64_t e_shoff;
+
+    uint32_t e_flags;
+
+    uint16_t e_ehsize;
+    uint16_t e_phentsize;
+    uint16_t e_phnum;
+
+    uint16_t e_shentsize;
+    uint16_t e_shnum;
+    uint16_t e_shstrndx;
+} Elf64_Ehdr;
+
+#define ELF_MAGIC_0 0x7F
+#define ELF_MAGIC_1 'E'
+#define ELF_MAGIC_2 'L'
+#define ELF_MAGIC_3 'F'
+
+#define ELFCLASS64 2
+#define ELFDATA2LSB 1
+
+#define ET_EXEC 2
+#define EM_X86_64 0x3E
 
 EFI_STATUS efi_main(
     EFI_HANDLE image_handle,
@@ -328,7 +363,6 @@ EFI_STATUS efi_main(
         }
     }
 
-
     static CHAR16 message[] = {
         'K', 'e', 'r', 'n', 'e', 'l', ' ',
         'J', 'e', 'n', 'd', 'e', 'l', 'a',
@@ -338,6 +372,114 @@ EFI_STATUS efi_main(
     };
 
     print(system_table, message);
+
+    Elf64_Ehdr elf_header;
+
+    UINTN elf_header_size = sizeof(Elf64_Ehdr);
+
+    status = kernel_file->Read(
+        kernel_file,
+        &elf_header_size,
+        &elf_header
+    );
+
+    if (status != EFI_SUCCESS || elf_header_size != sizeof(Elf64_Ehdr)) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'g', 'a', 'g', 'a', 'l', ' ', 'm', 'e', 'm', 'b', 'a', 'c', 'a',
+            ' ', 'E', 'L', 'F', ' ', 'h', 'e', 'a', 'd', 'e', 'r',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    if (elf_header.e_ident[0] != ELF_MAGIC_0 ||
+        elf_header.e_ident[1] != ELF_MAGIC_1 ||
+        elf_header.e_ident[2] != ELF_MAGIC_2 ||
+        elf_header.e_ident[3] != ELF_MAGIC_3) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'b', 'u', 'k', 'a', 'n', ' ', 'E', 'L', 'F',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    if (elf_header.e_ident[4] != ELFCLASS64) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'b', 'u', 'k', 'a', 'n', ' ', 'E', 'L', 'F', '6', '4',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    if (elf_header.e_ident[5] != ELFDATA2LSB) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'b', 'u', 'k', 'a', 'n', ' ', 'E', 'L', 'F',
+            ' ', 'l', 'i', 't', 't', 'l', 'e', '-', 'e', 'n', 'd', 'i', 'a', 'n',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    if (elf_header.e_type != ET_EXEC || elf_header.e_machine != EM_X86_64) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'E', 'L', 'F', ' ', 'b', 'u', 'k', 'a', 'n', ' ',
+            'e', 'x', 'e', 'c', 'u', 't', 'a', 'b', 'l', 'e',
+            ' ', 'x', '8', '6', '_', '6', '4',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    static CHAR16 valid_message[] = {
+        'E', 'L', 'F', '6', '4', ' ',
+        'K', 'e', 'r', 'n', 'e', 'l', ' ',
+        'J', 'e', 'n', 'd', 'e', 'l', 'a',
+        ' ', 'v', 'a', 'l', 'i', 'd',
+        '\r', '\n',
+        0
+    };
+
+    print(system_table, valid_message);
 
     kernel_file->Close(kernel_file);
 
