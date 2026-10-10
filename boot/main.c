@@ -126,6 +126,11 @@ typedef EFI_STATUS (*EFI_FILE_READ)(
     void *buffer
 );
 
+typedef EFI_STATUS (*EFI_FILE_SET_POSITION)(
+    struct EFI_FILE_PROTOCOL *this,
+    uint64_t position
+);
+
 typedef struct EFI_FILE_PROTOCOL {
     uint64_t Revision;
 
@@ -134,19 +139,10 @@ typedef struct EFI_FILE_PROTOCOL {
 
     void *Delete;
     EFI_FILE_READ Read;
-
     void *Write;
+
     void *GetPosition;
-    void *SetPosition;
-    void *GetInfo;
-    void *SetInfo;
-    void *Flush;
-    void *OpenEx;
-    void *CloseEx;
-    void *DeleteEx;
-    void *ReadEx;
-    void *WriteEx;
-    void *FlushEx;
+    EFI_FILE_SET_POSITION SetPosition;
 } EFI_FILE_PROTOCOL;
 
 typedef struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
@@ -233,6 +229,25 @@ typedef struct {
 
 #define ET_EXEC 2
 #define EM_X86_64 0x3E
+
+/*
+ * Elf64_Ehdr
+ */
+typedef struct {
+    uint32_t p_type;
+    uint32_t p_flags;
+
+    uint64_t p_offset;
+    uint64_t p_vaddr;
+    uint64_t p_paddr;
+
+    uint64_t p_filesz;
+    uint64_t p_memsz;
+
+    uint64_t p_align;
+} Elf64_Phdr;
+
+#define PT_LOAD 1
 
 EFI_STATUS efi_main(
     EFI_HANDLE image_handle,
@@ -373,6 +388,7 @@ EFI_STATUS efi_main(
 
     print(system_table, message);
 
+    // Validasi elf header
     Elf64_Ehdr elf_header;
 
     UINTN elf_header_size = sizeof(Elf64_Ehdr);
@@ -481,6 +497,115 @@ EFI_STATUS efi_main(
 
     print(system_table, valid_message);
 
+    // 
+    if (elf_header.e_phentsize != sizeof(Elf64_Phdr) || elf_header.e_phnum == 0) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'P', 'r', 'o', 'g', 'r', 'a', 'm', ' ',
+            'H', 'e', 'a', 'd', 'e', 'r', ' ', 't', 'i', 'd', 'a', 'k', ' ',
+            'v', 'a', 'l', 'i', 'd',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    status = kernel_file->SetPosition(
+        kernel_file,
+        elf_header.e_phoff
+    );
+
+    if (status != EFI_SUCCESS) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            'g', 'a', 'g', 'a', 'l', ' ', 'S', 'e', 't',
+            'P', 'o', 's', 'i', 't', 'i', 'o', 'n',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    uint16_t load_segment_count = 0;
+
+    for (uint16_t i = 0; i < elf_header.e_phnum; i++) {
+
+        Elf64_Phdr program_header;
+
+        UINTN program_header_size = sizeof(Elf64_Phdr);
+
+        status = kernel_file->Read(
+            kernel_file,
+            &program_header_size,
+            &program_header
+        );
+
+        if (status != EFI_SUCCESS ||
+            program_header_size != sizeof(Elf64_Phdr)) {
+
+            static CHAR16 error_message[] = {
+                'E', 'r', 'r', 'o', 'r', ':', ' ',
+                'g', 'a', 'g', 'a', 'l', ' ',
+                'm', 'e', 'm', 'b', 'a', 'c', 'a',
+                ' ', 'P', 'r', 'o', 'g', 'r', 'a', 'm',
+                ' ', 'H', 'e', 'a', 'd', 'e', 'r',
+                '\r', '\n',
+                0
+            };
+
+            print(system_table, error_message);
+
+            for (;;) {
+                __asm__ volatile ("hlt");
+            }
+        }
+
+        if (program_header.p_type == PT_LOAD) {
+            load_segment_count++;
+        }
+    }
+
+    if (load_segment_count == 0) {
+
+        static CHAR16 error_message[] = {
+            'E', 'r', 'r', 'o', 'r', ':', ' ',
+            't', 'i', 'd', 'a', 'k', ' ', 'a', 'd', 'a', ' ',
+            'P', 'T', '_', 'L', 'O', 'A', 'D',
+            '\r', '\n',
+            0
+        };
+
+        print(system_table, error_message);
+
+        for (;;) {
+            __asm__ volatile ("hlt");
+        }
+    }
+
+    static CHAR16 program_header_valid_message[] = {
+        'P', 'r', 'o', 'g', 'r', 'a', 'm', ' ',
+        'H', 'e', 'a', 'd', 'e', 'r',
+        ' ', 'J', 'e', 'n', 'd', 'e', 'l', 'a',
+        ' ', 'v', 'a', 'l', 'i', 'd',
+        '\r', '\n',
+        0
+    };
+
+    print(system_table, program_header_valid_message);
+
+    //
     kernel_file->Close(kernel_file);
 
     for (;;) {
